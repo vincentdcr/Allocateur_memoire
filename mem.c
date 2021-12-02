@@ -24,6 +24,7 @@
 */
 struct allocator_header {
         size_t memory_size;
+        struct fb* first;
 	mem_fit_function_t *fit;
 };
 
@@ -64,13 +65,18 @@ void mem_init(void* mem, size_t taille)
 	 */
 	assert(mem == get_system_memory_addr());
 	assert(taille == get_system_memory_size());
-	/* ... */
+	
+	struct fb * freebloc;
+	freebloc->size = taille;
+	freebloc->next = NULL;
+	get_header()->first = freebloc;
+	
 	mem_fit(&mem_fit_first);
 }
-
+/*while < SIZE*/
 void mem_show(void (*print)(void *, size_t, int)) {
-	/* ... */
-	while (/* ... */ 0) {
+	struct fb* ptr_tmp = get_header()->first;
+	while (size) {
 		/* ... */
 		print(/* ... */NULL, /* ... */0, /* ... */0);
 		/* ... */
