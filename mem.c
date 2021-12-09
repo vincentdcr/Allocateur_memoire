@@ -55,31 +55,37 @@ struct fb {
 	/* ... */
 };
 
-
-void mem_init(void* mem, size_t taille)
-{
-        memory_addr = mem;
-        *(size_t*)memory_addr = taille;
+void mem_init(void* mem, size_t taille) {
+    memory_addr = mem;
+    *(size_t*)memory_addr = taille;
 	/* On vérifie qu'on a bien enregistré les infos et qu'on
 	 * sera capable de les récupérer par la suite
 	 */
 	assert(mem == get_system_memory_addr());
 	assert(taille == get_system_memory_size());
 	
-	struct fb * freebloc;
-	freebloc->size = taille;
-	freebloc->next = NULL;
-	get_header()->first = freebloc;
+	struct fb tmp = {taille, NULL};
+	struct fb* freeblock = &tmp;
+
+	get_header()->first = freeblock;
 	
 	mem_fit(&mem_fit_first);
 }
 /*while < SIZE*/
 void mem_show(void (*print)(void *, size_t, int)) {
 	struct fb* ptr_tmp = get_header()->first;
-	while (size) {
-		/* ... */
-		print(/* ... */NULL, /* ... */0, /* ... */0);
-		/* ... */
+	size_t* pos = get_system_memory_addr();
+	size_t block_size;
+	while ((size_t)pos < (size_t)(get_system_memory_size()+memory_addr)) {
+		block_size = *pos;
+		if (pos < (size_t*)ptr_tmp) {
+			print(pos, *pos, 1);
+		} else {
+			print(pos, ptr_tmp->size, 0);
+			ptr_tmp = ptr_tmp->next;
+		}
+		pos += block_size;
+		pos= (size_t*)pos;
 	}
 }
 
