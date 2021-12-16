@@ -107,7 +107,14 @@ void mem_free(void* mem) {
 
 
 struct fb* mem_fit_first(struct fb *list, size_t size) {
-	return NULL;
+    struct fb* current = list;
+    while(current != NULL) {
+        if(current->size >= size) {
+            return current;
+		}
+        current = current->next;
+    }
+    return NULL;
 }
 
 /* Fonction à faire dans un second temps
@@ -129,9 +136,35 @@ size_t mem_get_size(void *zone) {
  * autres stratégies d'allocation
  */
 struct fb* mem_fit_best(struct fb *list, size_t size) {
-	return NULL;
+	struct fb* current = list;
+	struct fb* tmp = current;
+	while (current->size < size){
+		if (current == NULL) {
+			return NULL;
+		}
+		current = current->next;
+	}
+	while (current != NULL) {
+		if (current->size >= size && current->size < tmp->size) {
+			tmp = current;
+		}
+		current = current->next;
+	}
+	return tmp;
 }
 
 struct fb* mem_fit_worst(struct fb *list, size_t size) {
-	return NULL;
+    struct fb* current = list;
+    struct fb* tmp = current;
+    while(current != NULL) {
+        if(current->size >= tmp->size) {
+            tmp = current;
+		}
+        current = current->next;
+    }
+    if (tmp->size < size) {
+		return NULL;
+	} else { 
+        return tmp;
+	}
 }
