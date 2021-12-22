@@ -159,7 +159,7 @@ void mem_free(void* mem) {
         } else { 
             is_allocated_before=1;
         }
-		
+
         ptr_current_zone += block_size;
         ptr_current_zone= (size_t*)ptr_current_zone;
     }
@@ -208,7 +208,7 @@ void mem_free(void* mem) {
 
 struct fb* mem_fit_first(struct fb *list, size_t size) {
     struct fb* current = list;
-    while(current != NULL) {
+    while((void*)current != get_system_memory_addr()+get_system_memory_size()) {
         if(current->size >= size) {
             return current;
 		}
@@ -225,11 +225,8 @@ struct fb* mem_fit_first(struct fb *list, size_t size) {
  * (ou en discuter avec l'enseignant)
  */
 size_t mem_get_size(void *zone) {
-	/* zone est une adresse qui a été retournée par mem_alloc() */
-
-	/* la valeur retournée doit être la taille maximale que
-	 * l'utilisateur peut utiliser dans cette zone */
-	return 0;
+	size_t taille_reelle = *(size_t*)zone;
+	return taille_reelle-sizeof(size_t);
 }
 
 /* Fonctions facultatives

@@ -14,6 +14,9 @@ void* mem_realloc(void *old, size_t new_size);
 /* nécessaire pour le mem_shell */
 void mem_show(void (*print)(void *adr, size_t size, int free));
 
+
+size_t mem_get_size(void *zone);
+
 /* Choix de la stratégie et strategies usuelles */
 /* Si vous avez le temps... */
 typedef struct fb* (mem_fit_function_t)(struct fb*, size_t);
