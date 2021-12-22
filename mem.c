@@ -64,8 +64,9 @@ void mem_init(void* mem, size_t taille) {
 	assert(mem == get_system_memory_addr());
 	assert(taille == get_system_memory_size());
 	
-	struct fb tmp = {taille, NULL};
-	struct fb* freeblock = &tmp;
+	struct fb* freeblock = (struct fb*)(get_system_memory_addr()+sizeof(struct allocator_header));
+	freeblock->size = taille-sizeof(struct allocator_header);
+	freeblock->next = get_system_memory_addr()+get_system_memory_size();
 
 	get_header()->first = freeblock;
 	
@@ -73,19 +74,21 @@ void mem_init(void* mem, size_t taille) {
 }
 /*while < SIZE*/
 void mem_show(void (*print)(void *, size_t, int)) {
-	struct fb* ptr_tmp = get_header()->first;
-	size_t* pos = get_system_memory_addr();
+	struct fb* ptr_current_fb = get_header()->first;
+	void* ptr_current_zone = get_system_memory_addr()+sizeof(struct allocator_header);
+	void *ptr_end_of_memory = get_system_memory_addr();
+	ptr_end_of_memory = ptr_end_of_memory+(get_system_memory_size()-sizeof(struct allocator_header));
+
 	size_t block_size;
-	while ((size_t)pos < (size_t)(get_system_memory_size()+memory_addr)) {
-		block_size = *pos;
-		if (pos < (size_t*)ptr_tmp) {
-			print(pos, *pos, 1);
-		} else {
-			print(pos, ptr_tmp->size, 0);
-			ptr_tmp = ptr_tmp->next;
+	while (ptr_current_zone < ptr_end_of_memory) {
+		block_size = *(size_t*)ptr_current_zone;
+		if (ptr_current_zone < (void*)ptr_current_fb) {	// Zone occupée
+			print(ptr_current_zone, *(size_t*)ptr_current_zone, 0);
+		} else {						// Zone libre
+			print(ptr_current_zone, ptr_current_fb->size, 1);
+			ptr_current_fb = ptr_current_fb->next;
 		}
-		pos += block_size;
-		pos= (size_t*)pos;
+		ptr_current_zone += block_size;
 	}
 }
 
@@ -94,15 +97,112 @@ void mem_fit(mem_fit_function_t *f) {
 }
 
 void *mem_alloc(size_t taille) {
-	/* ... */
 	__attribute__((unused)) /* juste pour que gcc compile ce squelette avec -Werror */
-	struct fb *fb=get_header()->fit(/*...*/NULL, /*...*/0);
-	/* ... */
-	return NULL;
+
+	size_t taille_reelle = taille+sizeof(size_t);
+	taille_reelle += (8 - taille_reelle % 8);
+	struct fb *fb=get_header()->fit(get_header()->first, taille_reelle);
+	if (fb == NULL) {
+		return NULL;
+	}
+	// On sauvegarde les informations de la zone libre que l'on va modifier
+	size_t taille_prec = fb->size;
+	struct fb *next_prec = fb->next;
+	
+	// On trouve la zone libre précédant la zone libre que l'on va modifier
+	struct fb *fb_prec = get_header()->first;
+
+	if (fb_prec != fb) {	// Pas besoin de parcours si la mémoire n'est qu'une seule zone libre
+		while (fb_prec->next != fb) {
+			fb_prec = fb_prec->next;
+		}
+	}
+
+	// size_t * pour la zone allouée
+
+	void *fb_alias = fb;
+	size_t *zone_allouee = fb_alias;
+	if (taille_prec-taille_reelle >= sizeof(struct fb)) {
+		*zone_allouee = taille_reelle;
+		fb = fb_alias+taille_reelle;
+		fb->next = next_prec;
+		fb->size = taille_prec-taille_reelle;
+		fb_prec->next = fb;
+	} else {
+		taille_reelle = taille_prec;
+		*zone_allouee = taille_reelle;
+		fb_prec->next = next_prec;
+	}
+	if (fb_alias == get_header()->first) {
+		get_header()->first = fb_prec->next;
+	}
+	return zone_allouee;
 }
 
 
 void mem_free(void* mem) {
+    struct fb* ptr_current_fb = get_header()->first;
+    struct fb* previous_fb=get_header()->first; //init pr eviter seg fault si liberation 1ere ZL
+    int is_allocated_before=0;
+    void* ptr_current_zone = get_system_memory_addr()+sizeof(struct allocator_header);
+    void* addr_to_free = mem;
+    size_t block_size;
+
+    while (ptr_current_zone < addr_to_free ) {
+        block_size = *(size_t*)ptr_current_zone;
+
+        if (ptr_current_zone == (void*)ptr_current_fb) { //si on est sur ZL, on va chercher la prochaine
+            previous_fb = ptr_current_fb;
+            ptr_current_fb = ptr_current_fb->next;
+            is_allocated_before=0;
+
+        } else { 
+            is_allocated_before=1;
+        }
+		
+        ptr_current_zone += block_size;
+        ptr_current_zone= (size_t*)ptr_current_zone;
+    }
+
+    if ((void*)ptr_current_zone != addr_to_free || ptr_current_zone== (size_t*)ptr_current_fb){ //Erreur, il n'y a pas de bloc à l'adresse mem
+        return;                                                                    //OU Erreur, le bloc à libérer est deja libre
+    }
+
+    block_size = *(size_t*)ptr_current_zone;
+    int is_allocated_after=(ptr_current_zone+block_size != (size_t*)ptr_current_fb);
+
+    struct fb* new_fb;
+    new_fb = (struct fb *)ptr_current_zone;
+    new_fb->size=*(size_t*)ptr_current_zone;
+    new_fb->next=NULL;
+
+	if (ptr_current_fb==previous_fb) { //si on est a la tete
+        get_header()->first = new_fb;
+
+        if (!is_allocated_after) {
+            new_fb->size+=ptr_current_fb->size;
+            new_fb->next=ptr_current_fb->next;
+        } else {
+            new_fb->next=ptr_current_fb;
+        }
+
+    } else if (!is_allocated_before && !is_allocated_after) {    
+        previous_fb->size += block_size+ptr_current_fb->size;
+        previous_fb->next=ptr_current_fb->next;
+
+     } else if (!is_allocated_before) {
+        previous_fb->size += block_size;
+        previous_fb->next=ptr_current_fb;
+
+     } else if (!is_allocated_after) {
+         previous_fb->next=new_fb;
+         new_fb->size+=ptr_current_fb->size;
+         new_fb->next=ptr_current_fb->next;
+
+     } else {
+         previous_fb->next=new_fb;
+         new_fb->next=ptr_current_fb;
+     }
 }
 
 
