@@ -6,11 +6,12 @@ CC=gcc
 
 CFLAGS+= $(HOST32) -Wall -Werror -std=c99 -g -D_GNU_SOURCE
 CFLAGS+= -DDEBUG
+CFLAGS+= -DMEMORY_SIZE=8192000 #Pour passer de 8 Ko a 8 Mo de memoire
 # pour tester avec ls
 CFLAGS+= -fPIC
 LDFLAGS= $(HOST32)
 TESTS+=test_init
-PROGRAMS=memshell $(TESTS)
+PROGRAMS=memshell memshell_write $(TESTS)
 
 .PHONY: clean all test_ls
 

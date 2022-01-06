@@ -12,6 +12,7 @@
 /* function to retrieve info about the globally allocated memory zone */
 void *get_memory_adr();
 size_t get_memory_size();
+size_t mem_get_size(void *zone);
 
 /* function to try to allocate as much as memory as possible */
 void *alloc_max(size_t estimate);

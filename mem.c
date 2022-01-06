@@ -3,7 +3,7 @@
 
 #include <assert.h>
 #include <stddef.h>
-#include <string.h>
+#include <stdio.h>
 
 /* Définition de l'alignement recherché
  * Avec gcc, on peut utiliser __BIGGEST_ALIGNMENT__
@@ -14,6 +14,7 @@
 #else
 #define ALIGNMENT 16
 #endif
+
 
 /* structure placée au début de la zone de l'allocateur
 
@@ -96,9 +97,8 @@ void mem_fit(mem_fit_function_t *f) {
 	get_header()->fit = f;
 }
 
-void *mem_alloc(size_t taille) {
-	__attribute__((unused)) /* juste pour que gcc compile ce squelette avec -Werror */
 
+void *mem_alloc(size_t taille) {
 	size_t taille_reelle = taille+sizeof(size_t);
 	taille_reelle += (8 - taille_reelle % 8);
 	struct fb *fb=get_header()->fit(get_header()->first, taille_reelle);
@@ -119,7 +119,6 @@ void *mem_alloc(size_t taille) {
 	}
 
 	// size_t * pour la zone allouée
-
 	void *fb_alias = fb;
 	size_t *zone_allouee = fb_alias;
 	if (taille_prec-taille_reelle >= sizeof(struct fb)) {
@@ -136,22 +135,22 @@ void *mem_alloc(size_t taille) {
 	if (fb_alias == get_header()->first) {
 		get_header()->first = fb_prec->next;
 	}
-	return zone_allouee;
+	return zone_allouee+1;
 }
 
 
 void mem_free(void* mem) {
+	//cpt++;
     struct fb* ptr_current_fb = get_header()->first;
     struct fb* previous_fb=get_header()->first; //init pr eviter seg fault si liberation 1ere ZL
     int is_allocated_before=0;
-    void* ptr_current_zone = get_system_memory_addr()+sizeof(struct allocator_header);
-    void* addr_to_free = mem;
+    void* ptr_current_zone = get_system_memory_addr()+sizeof(struct allocator_header); //ptr vers debut allocateur
+    size_t* addr_to_free = mem-sizeof(size_t); //ptr vers zone a liberer
     size_t block_size;
-
-    while (ptr_current_zone < addr_to_free ) {
+	//Parcours des ZL et ZA pour savoir dans quelle configuration on est
+    while (ptr_current_zone <(void*) addr_to_free ) {
         block_size = *(size_t*)ptr_current_zone;
-
-        if (ptr_current_zone == (void*)ptr_current_fb) { //si on est sur ZL, on va chercher la prochaine
+        if (ptr_current_zone == (void*)ptr_current_fb) { //si on est sur ZL, on va chercher la prochaine ZL
             previous_fb = ptr_current_fb;
             ptr_current_fb = ptr_current_fb->next;
             is_allocated_before=0;
@@ -164,21 +163,20 @@ void mem_free(void* mem) {
         ptr_current_zone= (size_t*)ptr_current_zone;
     }
 
-    if ((void*)ptr_current_zone != addr_to_free || ptr_current_zone== (size_t*)ptr_current_fb){ //Erreur, il n'y a pas de bloc à l'adresse mem
-        return;                                                                    //OU Erreur, le bloc à libérer est deja libre
+    if (ptr_current_zone != addr_to_free || ptr_current_zone== (size_t*)ptr_current_fb){ //Erreur, il n'y a pas de bloc à l'adresse mem
+        printf("erreur parcours ne nous a pas emmener au bon endroit\n");
+		return;                                                                    //OU Erreur, le bloc à libérer est deja libre
     }
-
     block_size = *(size_t*)ptr_current_zone;
     int is_allocated_after=(ptr_current_zone+block_size != (size_t*)ptr_current_fb);
 
     struct fb* new_fb;
-    new_fb = (struct fb *)ptr_current_zone;
+    new_fb = (struct fb *)ptr_current_zone; //adresse de nouvelle ZL
     new_fb->size=*(size_t*)ptr_current_zone;
     new_fb->next=NULL;
-
+	//En fct de la config, on va lier les differentes ZL
 	if (ptr_current_fb==previous_fb) { //si on est a la tete
         get_header()->first = new_fb;
-
         if (!is_allocated_after) {
             new_fb->size+=ptr_current_fb->size;
             new_fb->next=ptr_current_fb->next;
@@ -191,11 +189,11 @@ void mem_free(void* mem) {
         previous_fb->next=ptr_current_fb->next;
 
      } else if (!is_allocated_before) {
-        previous_fb->size += block_size;
+		previous_fb->size += block_size;
         previous_fb->next=ptr_current_fb;
 
      } else if (!is_allocated_after) {
-         previous_fb->next=new_fb;
+		 previous_fb->next=new_fb;
          new_fb->size+=ptr_current_fb->size;
          new_fb->next=ptr_current_fb->next;
 
