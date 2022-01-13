@@ -83,10 +83,10 @@ void mem_show(void (*print)(void *, size_t, int)) {
 		block_size = *(size_t*)ptr_current_zone;
 
 		if (ptr_current_zone < (void*)ptr_current_fb) {				// Zone occupée
-			print(ptr_current_zone, *(size_t*)ptr_current_zone, 0);
+			print(ptr_current_zone+8, *(size_t*)ptr_current_zone, 0);
 
 		} else {													// Zone libre
-			print(ptr_current_zone, ptr_current_fb->size, 1);
+			print(ptr_current_zone+8, ptr_current_fb->size, 1);
 			ptr_current_fb = ptr_current_fb->next;
 		}
 		ptr_current_zone += block_size;
@@ -157,14 +157,13 @@ void *mem_alloc(size_t taille) {
 
 
 void mem_free(void* mem) {
-	//cpt++;
     struct fb* ptr_current_fb = get_header()->first;
     struct fb* previous_fb=get_header()->first; //init pr eviter seg fault si liberation 1ere ZL
-    int is_allocated_before=0;
+    int is_allocated_before=0; 
     void* ptr_current_zone = get_system_memory_addr()+sizeof(struct allocator_header); //ptr vers debut allocateur
     size_t* addr_to_free = mem-sizeof(size_t); //ptr vers zone a liberer
     size_t block_size;
-	//Parcours des ZL et ZA pour savoir dans quelle configuration on est
+	//Parcours des ZL et ZA pour arriver a zone a liberer et savoir dans quelle configuration on est
     while (ptr_current_zone <(void*) addr_to_free ) {
         block_size = *(size_t*)ptr_current_zone;
         if (ptr_current_zone == (void*)ptr_current_fb) { //si on est sur ZL, on va chercher la prochaine ZL
@@ -180,8 +179,9 @@ void mem_free(void* mem) {
         ptr_current_zone= (size_t*)ptr_current_zone;
     }
 
-    if (ptr_current_zone != addr_to_free || ptr_current_zone== (size_t*)ptr_current_fb){ //Erreur, il n'y a pas de bloc à l'adresse mem
-		return;                                                                    //OU Erreur, le bloc à libérer est deja libre
+    if (ptr_current_zone != addr_to_free || ptr_current_zone== (size_t*)ptr_current_fb){
+		 //Erreur, il n'y a pas de bloc à l'adresse mem OU Erreur, le bloc à libérer est deja libre
+		return;                                                                    
     }
     block_size = *(size_t*)ptr_current_zone;
     int is_allocated_after=(ptr_current_zone+block_size != (size_t*)ptr_current_fb);
@@ -191,31 +191,32 @@ void mem_free(void* mem) {
     new_fb->size=*(size_t*)ptr_current_zone;
     new_fb->next=NULL;
 	//En fct de la config, on va lier les differentes ZL
-    if (ptr_current_fb==previous_fb) { //si on est a la tete
+    if (ptr_current_fb==previous_fb) { //si le bloc qu'on veut allouer et AVANT 1ere ZL
         get_header()->first = new_fb;
-        if (!is_allocated_after) {
+        if (!is_allocated_after) { //Cas 1 : soit la tete est le prochain bloc
             new_fb->size+=ptr_current_fb->size;
             new_fb->next=ptr_current_fb->next;
-        } else {
+        } else { //Cas 2 : soit il y a un bloc entre le bloc a liberer et la 1ere ZL
             new_fb->next=ptr_current_fb;
         }
-    } else {
-        if(*((size_t*)ptr_current_zone-8)!=-1) {
-            return;
-        } if (!is_allocated_before && !is_allocated_after) {    
+    } else { //Si le bloc qu'on veut allouer et APRES la 1ere ZL
+		size_t* ptr_current_zone_alias = ptr_current_zone;
+        if(*(ptr_current_zone_alias-1)!=-1) { //A t-on effacer la garde ?
+           return;
+        } if (!is_allocated_before && !is_allocated_after) {	//Cas 3 : On peut lier avant et apres
             previous_fb->size += block_size+ptr_current_fb->size;
             previous_fb->next=ptr_current_fb->next;
 
-         } if (!is_allocated_before) {
+         } else if (!is_allocated_before) { //Cas 4 : On peut lier avant
             previous_fb->size += block_size;
             previous_fb->next=ptr_current_fb;
 
-         } if (!is_allocated_after) {
+         } else if (!is_allocated_after) { //Cas 5 : On peut lier apres
              previous_fb->next=new_fb;
              new_fb->size+=ptr_current_fb->size;
              new_fb->next=ptr_current_fb->next;
 
-         } else {
+         } else { //Cas 6 : On peut pas lier :(
              previous_fb->next=new_fb;
              new_fb->next=ptr_current_fb;
          }
