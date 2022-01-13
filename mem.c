@@ -69,7 +69,7 @@ void mem_init(void* mem, size_t taille) {
 
 	get_header()->first = fb;
 	
-	mem_fit(&mem_fit_best);
+	mem_fit(&mem_fit_first);
 }
 /*while < SIZE*/
 void mem_show(void (*print)(void *, size_t, int)) {
@@ -251,13 +251,13 @@ size_t mem_get_size(void *zone) {
  */
 struct fb* mem_fit_best(struct fb *list, size_t size) {
 	struct fb* current = list;
-	struct fb* tmp = current;
 	while (current->size < size){	// On trouve la première zone libre capable d'accueillir size, si elle existe
 		current = current->next;
 		if (current == NULL){
 			return NULL;
 		}
 	}
+	struct fb* tmp = current;
 	while (current != NULL) {	// On cherche la taille la plus proche
 		if (current->size >= size && current->size < tmp->size) {
 			tmp = current;
@@ -270,13 +270,13 @@ struct fb* mem_fit_best(struct fb *list, size_t size) {
 struct fb* mem_fit_worst(struct fb *list, size_t size) {
     struct fb* current = list;
     struct fb* tmp = current;
-    while(current != NULL) {
+    while(current != NULL) {	// On trouve la zone libre la plus grande
         if(current->size >= tmp->size) {
             tmp = current;
 		}
         current = current->next;
     }
-    if (tmp->size < size) {
+    if (tmp->size < size) {	// Puis on vérifie qu'elle est bien assez grande pour accueillir size
 		return NULL;
 	} else { 
         return tmp;

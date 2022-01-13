@@ -2,3 +2,4 @@
 .*.o.deps
 /memshell
 /test_init
+/memshell_write
