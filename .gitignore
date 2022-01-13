@@ -2,5 +2,5 @@
 .*.o.deps
 /memshell
 /test_init
-memshell_write
+/memshell_write
 /libmalloc.so
