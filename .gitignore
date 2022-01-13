@@ -3,3 +3,4 @@
 /memshell
 /test_init
 /memshell_write
+/libmalloc.so
