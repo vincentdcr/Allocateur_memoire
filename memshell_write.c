@@ -67,7 +67,7 @@ int main()
 	  else {
               printf("Memoire allouee en %d, de taille %ld\n", (int) ((void*)ptr-get_memory_adr()), *(ptr-1));
               for(int i=0; i<taille/8; i++){
-               *ptr= -1;
+               *ptr= 1;
               ptr++;
               }
       }
