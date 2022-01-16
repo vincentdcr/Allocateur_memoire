@@ -11,12 +11,15 @@ CFLAGS+= -DMEMORY_SIZE=819200 #Pour passer de 8 Ko a 8 Mo de memoire
 CFLAGS+= -fPIC
 LDFLAGS= $(HOST32)
 TESTS+=test_init
-PROGRAMS=memshell memshell_write $(TESTS)
+PROGRAMS=memshell memshell_write tests_allocateur $(TESTS)
 
 .PHONY: clean all test_ls
 
 all: $(PROGRAMS)
 	for file in $(TESTS);do ./$$file; done
+
+tests: $(PROGRAMS)
+	./tests_allocateur
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) -MMD -MF .$@.deps -o $@ $<

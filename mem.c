@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <valgrind/valgrind.h>
 
 /* Définition de l'alignement recherché
  * Avec gcc, on peut utiliser __BIGGEST_ALIGNMENT__
@@ -67,6 +68,7 @@ void mem_init(void* mem, size_t taille) {
 	fb->size = taille-sizeof(struct allocator_header);	// On enlève donc la taille d'un allocateur à la taille de la mémoire
 	fb->next = get_system_memory_addr()+get_system_memory_size();
 
+	VALGRIND_CREATE_MEMPOOL(get_header(), 0, 0); // On ne gère pas les débordements mémoires, uniquement le nombre d'allocs/frees
 	get_header()->first = fb;
 	
 	mem_fit(&mem_fit_first);
@@ -152,6 +154,10 @@ void *mem_alloc(size_t taille) {
 	if (fb_alias == get_header()->first) {
 		get_header()->first = fb_prec->next;
 	}
+
+	//On fait comprendre a valgrind qu'on vient de faire une allocation (ancrage : tête de l'allocateur)
+	VALGRIND_MEMPOOL_ALLOC(get_header(), zone_allouee+1, taille_reelle-sizeof(size_t));
+
 	return zone_allouee+1;	// On retourne le début de la zone allouée en sautant le size_t qui décrit notre taille de zone
 }
 
@@ -199,6 +205,10 @@ void mem_free(void* mem) {
         } else { //Cas 2 : soit il y a un bloc entre le bloc a liberer et la 1ere ZL
             new_fb->next=ptr_current_fb;
         }
+
+		//On fait comprendre à valgrind qu'on vient de free la zone pointée par mem
+		VALGRIND_MEMPOOL_FREE(get_header(), mem);
+
     } else { //Si le bloc qu'on veut allouer et APRES la 1ere ZL
 		size_t* ptr_current_zone_alias = ptr_current_zone;
         if(*(ptr_current_zone_alias-1)!=-1) { //A t-on effacer la garde ?
@@ -220,6 +230,8 @@ void mem_free(void* mem) {
              previous_fb->next=new_fb;
              new_fb->next=ptr_current_fb;
          }
+		//On fait comprendre à valgrind qu'on vient de free la zone pointée par mem
+		VALGRIND_MEMPOOL_FREE(get_header(), mem);
     }
 }
 
